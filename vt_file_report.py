@@ -108,7 +108,7 @@ def init_cli():
     parser.add_argument('--configfile', help = 'configuration file')
 
     ##### VirusTotal API invocation
-    parser.add_argument('--apikey', help = 'VT API key')
+    parser.add_argument('--apikey', help = 'VirusTotal API key')
 
     ##### VirusTotal API calls
     parser.add_argument('--hashfile', help = 'text file with hashes')
