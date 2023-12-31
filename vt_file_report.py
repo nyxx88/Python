@@ -91,7 +91,11 @@ def init_configfile(config_file):
 
     config = configparser.RawConfigParser()
     config.read_string(file_content)
-    vt_api_key = config[dummy]['VT_APIKEY']
+
+    try:
+        vt_api_key = config[dummy]['VT_APIKEY']
+    except Exception as ex:
+        exception_message(config_file + ' :', ex)
 
 def init_cli():
     global vt_api_key
