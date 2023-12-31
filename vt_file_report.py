@@ -4,6 +4,30 @@
 # Packages to install:
 # - "pip install httpx[http2]" (Install httpx with HTTP/2 support)
 #
+# Usage:
+#  - Key parameter is vt_api_key. Its value can be initialized from:
+#    - environment variable $VT_APIKEY (if it exists)
+#    - key-value pair in a text configuration file with the key VT_APIKEY. Specify the configuration file using the
+#      argument "--config_file"
+#    - commandline argument "--vt_apikey"
+#  - Takes hash values as input in one of the following forms via commandline arguments:
+#    - list of hash values in a file using "--hashfile"
+#    - a single hash value using "--hashvalue"
+#  - Default output is CSV formatted string of:
+#    - hash value
+#    - malicious count (number of malicious detection by vendors)
+#    - undetected count (number of non-malicious detection by vendors)
+#  - Optional output is specific verdict by vendors. Specify the list of vendors using the argument "--vendors"
+#
+#
+# Example:
+#
+#           vt_file_report.py --hashfile hashlist.txt --vendors Abc Def Xyz
+#
+#   In this case, the vt_api_key is obtained from environment variable, since no configuration file was specified &
+#   neither was it passed via a command line argument. Specific detection results for 3 vendors "Abc", "Def" & "Xyz"
+#   were requested.
+#
 #######################################################################################################################
 #######################################################################################################################
 
@@ -90,7 +114,7 @@ def init_cli():
     parser.add_argument('--hashfile', help = 'text file with hashes')
     parser.add_argument('--hashvalue', help = 'hash value')
 
-    ##### desired utput
+    ##### desired output
     parser.add_argument('--vendors', nargs = '*', help = 'list of vendors')
 
     args = parser.parse_args()
