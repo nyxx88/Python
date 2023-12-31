@@ -133,22 +133,6 @@ def build_api_header(*dicts):
 
     return (h)
 
-def build_api_data(*params):                                                                                           # accepts multiple parameters, can be of tuple or dictionary
-    d = ''
-
-    if (len(params) > 0):
-        i = 0
-
-        for param in params:
-            for key, value in param.items():
-                if (i > 0):
-                    d = d + '&'                                                                                        # delimit the parameters
-
-                d = d + key + '=' + str(value)
-                i += 1
-
-    return (d)
-
 ## VT API calls #######################################################################################################
 
 def vt_get_a_file_report(api_client, file_hash):                                                                       # get results based on file hash
