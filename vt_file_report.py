@@ -163,7 +163,7 @@ def build_api_header(*dicts):
 
 ## VT API calls #######################################################################################################
 
-def vt_get_a_file_report(api_client, file_hash):                                                                       # get results based on file hash
+def vt_api_get_a_file_report(api_client, file_hash):                                                                       # get results based on file hash
 
     api_endpoint = '/api/v3/files/'
 
@@ -179,7 +179,7 @@ def vt_get_a_file_report(api_client, file_hash):                                
 ## process the file hashes ############################################################################################
 
 def process_hash(api_client, file_hash, vendors):
-    r = vt_get_a_file_report(api_client, file_hash)
+    r = vt_api_get_a_file_report(api_client, file_hash)
     if (r.status_code == 200):
         # print(r.content.decode('utf-8'))                                                                             # returns the content of the response, in bytes. then decode it with UTF-8
         # print(r.text)                                                                                                # returns the content of the response, in unicode
