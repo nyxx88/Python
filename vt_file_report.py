@@ -9,7 +9,7 @@
 #    - environment variable $VT_APIKEY (if it exists)
 #    - key-value pair in a text configuration file with the key VT_APIKEY. Specify the configuration file using the
 #      argument "--config_file"
-#    - commandline argument "--vt_apikey"
+#    - commandline argument "--apikey"
 #  - Takes hash values as input in one of the following forms via commandline arguments:
 #    - list of hash values in a file using "--hashfile"
 #    - a single hash value using "--hashvalue"
@@ -108,7 +108,7 @@ def init_cli():
     parser.add_argument('--configfile', help = 'configuration file')
 
     ##### VirusTotal API invocation
-    parser.add_argument('--vt_apikey', help = 'VT API key')
+    parser.add_argument('--apikey', help = 'VT API key')
 
     ##### VirusTotal API calls
     parser.add_argument('--hashfile', help = 'text file with hashes')
@@ -122,9 +122,9 @@ def init_cli():
     if args.configfile is not None:
         init_configfile(args.configfile)
 
-    if args.vt_apikey is not None:
-        vt_api_key = args.vt_apikey
-    elif (vt_api_key is None) or (len(vt_api_key) == 0):
+    if args.apikey is not None:                                                                                        # if API key is provided via command line
+        vt_api_key = args.apikey
+    elif (vt_api_key is None) or (len(vt_api_key) == 0):                                                               # if API key has never been defined, or is an empty string
         error_message('VirusTotal API key missing.\n')
 
     if (args.hashvalue is not None) and (args.hashfile is not None):
