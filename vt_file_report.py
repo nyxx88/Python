@@ -66,12 +66,12 @@ class vt_api_client:
 # functions
 #######################################################################################################################
 
-def error_message(str):
-    print(str)
-    exit()
+def error_message(str, exception = None):
+    if exception is None:
+        print(str)
+    else:                                                                                                              # expecting an Exception
+        print(str, exception)
 
-def exception_message(msg, ex):
-    print(msg, ex)
     exit()
 
 def init_envvar():
@@ -87,7 +87,7 @@ def init_configfile(config_file):
         with open(config_file) as f:                                                                                   # ConfigParser needs a [section] structure, otherwise it is not happy
             file_content = '[' + dummy +']\n' + f.read()
     except Exception as ex:
-        exception_message(config_file + ' :', ex)
+        error_message(config_file + ' :', exception = ex)
 
     config = configparser.RawConfigParser()
     config.read_string(file_content)
@@ -95,7 +95,7 @@ def init_configfile(config_file):
     try:
         vt_api_key = config[dummy]['VT_APIKEY']
     except Exception as ex:
-        exception_message(config_file + ' :', ex)
+        error_message(config_file + ' :', exception = ex)
 
 def init_cli():
     global vt_api_key
@@ -174,7 +174,7 @@ def vt_get_a_file_report(api_client, file_hash):                                
         r = api_client.http_client.get(url, headers = h)
         return(r)
     except Exception as ex:
-        exception_message(url + ' :', ex)
+        error_message(url + ' :', exception = ex)
 
 ## process the file hashes ############################################################################################
 
@@ -199,7 +199,7 @@ def process_hash(api_client, file_hash, vendors):
 
                 print(', ' + vendor_category, end='')
 
-            print('')
+        print('')
     else:
         print(file_hash, end='')
         print(', ERROR: ' + str(r.status_code))
@@ -221,4 +221,4 @@ if hashfile is not None:
             for file_hash in file:
                 process_hash(vt_client, file_hash.strip(), vendors)                                                    # file content comes with newline, which causes problems
     except Exception as ex:
-        exception_message(hashfile + ' :', ex)
+        error_message(hashfile + ' :', exception = ex)
