@@ -149,8 +149,9 @@ def init_param():
     init_cli()
     vt_base_url = 'https://www.virustotal.com'
 
-## API helper #########################################################################################################
-def build_api_header(*dicts):
+## HTTP helpers #######################################################################################################
+
+def build_http_header(*dicts):
     h = {
             'accept': 'application/json'
         }
@@ -168,7 +169,7 @@ def vt_get_a_file_report(api_client, file_hash):                                
     api_endpoint = '/api/v3/files/'
 
     url = api_client.base_url + api_endpoint + file_hash
-    h = build_api_header(dict([('x-apikey', api_client.api_key)]))
+    h = build_http_header(dict([('x-apikey', api_client.api_key)]))
 
     try:
         r = api_client.http_client.get(url, headers = h)
