@@ -1,0 +1,278 @@
+#######################################################################################################################
+#######################################################################################################################
+#
+# Packages to install:
+# - "pip install httpx[http2]" (Install httpx with HTTP/2 support)
+#
+# Usage:
+#  - Key parameters are:
+#    - cs_base_url -- Which Falcon cloud the tenant CID is on
+#    - cs_client_id -- ID of API client
+#    - cs_client_secret -- Secret of API client
+#  - These 3 parameters can be initialized from:
+#    - environment variables (if they exists):
+#      - URL
+#      - CLIENT_ID
+#      - CLIENT_SECRET
+#    - key-value pair in a text configuration file (specified via commandline using argument "--config_file") with the
+#      following keys:
+#      - URL
+#      - CLIENT_ID
+#      - CLIENT_SECRET
+#    - commandline arguments
+#      - "--cs_url"
+#      - "--cs_id"
+#      - "--cs_secret"
+#
+# Modify the logic to call the APIs in the main portion of the script (near the bottom) according to your needs.
+#
+# Note: Usage of the various CrowdStrike APIs are beyond the scope of this script. There are other online resources
+#       that are better equipped for that purpose.
+#
+# Example:
+#
+#           cs_api.py --configfile config.txt
+#
+#    The configuration file "config.txt" contains the necessary parameters needed for the API calls to work.
+#
+#######################################################################################################################
+#######################################################################################################################
+
+import argparse
+import base64
+import configparser
+import httpx
+import os
+import time
+
+#######################################################################################################################
+# global variables
+#######################################################################################################################
+
+##### CrowdStrike API invocation
+cs_base_url = None
+cs_client_id = None
+cs_client_secret = None
+
+#######################################################################################################################
+# classes
+#######################################################################################################################
+
+class cs_api_client:
+    access_token = None
+    time_start = None                                                                                                  # print (time.asctime(time.localtime(api_client.time_start)))
+
+    authenticated_header = None
+
+    http_client = httpx.Client(http2=True)
+
+    def __init__(self, base_url, client_id, client_secret):
+        self.base_url = base_url
+        self.client_id = client_id
+        self.client_secret = client_secret
+
+    ## CS API helpers #################################################################################################
+    def cs_generic_get(self, url, parameters):
+
+        if (len(parameters) > 0):
+            url = url + '?' + build_http_data(parameters)                                                              # dictionary datatype
+
+        return(self.http_client.get(url, headers = self.authenticated_header))
+
+    ## CS API calls ###################################################################################################
+    def cs_auth(self):                                                                                                 # authenticate
+        api_endpoint = '/oauth2/token'
+
+        url = self.base_url + api_endpoint
+        h = build_http_header({'Content-Type': 'application/x-www-form-urlencoded'})
+        d = build_http_data({'client_id': self.client_id}, {'client_secret': self.client_secret})                      # tuple datatype
+
+        r = self.http_client.post(url, headers = h, data = d)
+        # further enhancement can be done to check if redirection is supported (status code 308)
+
+        if (r.status_code == 201):                                                                                     # successful authentication will return 201
+            self.access_token = r.json()['access_token']
+            self.time_start = time.time()
+            self.authenticated_header = build_http_header({'authorization' : 'bearer ' + self.access_token})
+            return(True)
+        else:
+            return(False)
+
+    def cs_revoke_auth(self):                                                                                          # revoke access token
+        api_endpoint = '/oauth2/revoke'
+
+        url = self.base_url + api_endpoint
+        h = build_http_header({'Content-Type': 'application/x-www-form-urlencoded'}, {'authorization': 'basic ' + base64.b64encode(bytes(self.client_id + ':' + self.client_secret, 'utf-8')).decode('utf-8')})
+        d = build_http_data({'client_id': self.client_id }, {'token': self.access_token})                              # tuple datatype
+
+        r = self.http_client.post(url, headers = h, data = d)
+        return (r)
+
+    def cs_list_host_ids(self, **parameters):
+        api_endpoint = '/devices/queries/devices/v1'
+
+        url = self.base_url + api_endpoint
+
+        return(self.cs_generic_get(url, parameters))
+
+    def cs_get_indicators_by_fql(self, **parameters):
+        api_endpoint = '/intel/queries/indicators/v1'
+
+        url = self.base_url + api_endpoint
+
+        return(self.cs_generic_get(url, parameters))
+
+    def cs_get_indicators_info_by_fql(self, **parameters):
+        api_endpoint = '/intel/combined/indicators/v1'
+
+        url = self.base_url + api_endpoint
+
+        return(self.cs_generic_get(url, parameters))
+
+#######################################################################################################################
+# functions
+#######################################################################################################################
+
+def error_message(str, exception = None):
+    if exception is None:
+        print(str)
+    else:                                                                                                              # expecting an Exception
+        print(str, exception)
+    exit()
+
+def has_value(var):
+    if (var is None) or (len(var) == 0):
+        return(False)
+    else:
+        return(True)
+
+def init_envvar():
+    global cs_base_url
+    global cs_client_id
+    global cs_client_secret
+
+    cs_base_url = os.environ.get('URL')
+    cs_client_id = os.environ.get('CLIENT_ID')
+    cs_client_secret = os.environ.get('CLIENT_SECRET')
+
+def init_configfile(config_file):
+    global cs_base_url
+    global cs_client_id
+    global cs_client_secret
+
+    dummy = ' '
+    try:
+        with open(config_file) as f:                                                                                   # ConfigParser needs a [section] structure, otherwise it is not happy
+            file_content = '[' + dummy +']\n' + f.read()
+    except Exception as ex:
+       error_message(config_file + ' :', exception = ex)
+
+    config = configparser.RawConfigParser()
+    config.read_string(file_content)
+
+    try:
+        cs_base_url = config[dummy]['URL']
+        cs_client_id = config[dummy]['CLIENT_ID']
+        cs_client_secret = config[dummy]['CLIENT_SECRET']
+    except Exception as ex:
+        error_message(config_file + ' :', exception = ex)
+
+def init_cli():
+    global cs_base_url
+    global cs_client_id
+    global cs_client_secret
+
+    # parse CLI
+    parser = argparse.ArgumentParser()
+
+    ##### generic use -- config file
+    parser.add_argument('--configfile', help = 'configuration file')
+
+    ##### CrowdStrike API invocation
+    parser.add_argument('--cs_url', help = 'CrowdStrike API base URL')
+    parser.add_argument('--cs_id', help = 'CrowdStrike API client ID')
+    parser.add_argument('--cs_secret', help = 'CrowdStrike API client password')
+
+    args = parser.parse_args()
+
+    if args.configfile is not None:
+        init_configfile(args.configfile)
+
+    if args.cs_url is not None:
+        cs_base_url = args.cs_url
+    if args.cs_id is not None:
+        cs_client_id = args.cs_id
+    if args.cs_secret is not None:
+        cs_client_secret = args.cs_secret
+
+    if not ((has_value(cs_base_url)) and (has_value(cs_client_id)) and (has_value(cs_client_secret))):
+        error_message('Insufficient arguments to proceed.\n')
+
+def init_param():
+    init_envvar()
+    init_cli()
+
+## HTTP helpers #######################################################################################################
+
+def build_http_header(*dicts):
+    h = {
+            'accept': 'application/json'
+        }
+
+    if (len(dicts) > 0):
+        for dict in dicts:
+            h.update(dict)
+
+    return (h)
+
+def build_http_data(*params):                                                                                          # accepts multiple parameters, can be of tuple or dictionary
+    d = ''
+
+    if (len(params) > 0):
+        i = 0
+
+        for param in params:
+            for key, value in param.items():
+                if (i > 0):
+                    d = d + '&'                                                                                        # delimit the parameters
+
+                d = d + key + '=' + str(value)
+                i += 1
+
+    return (d)
+
+#######################################################################################################################
+# main program
+#######################################################################################################################
+
+init_param()
+
+cs_client = cs_api_client(cs_base_url, cs_client_id, cs_client_secret)
+
+if (cs_client.cs_auth() == False):
+    error_message('Authentication failure.\n')
+
+# examples of how to call the API functions
+
+# r = cs_client.cs_list_host_ids()                                                                                       # API with default parameter values -- returns list of hosts
+# r = cs_client.cs_list_host_ids(limit = 3, offset = 2)                                                                  # API with optional parameters values -- returns list of hosts
+
+# if using operators in FQL query, it should be of the form of:
+# - parameter, followed by a colon, operator, value in double quotes
+# - e.g. published_date:>="2024-01-01T12:00:00Z" (human readable)
+# - e.g. published_date%3A%3E%3D"2024-01-03T12%3A00%3A00Z (in code)
+
+# more examples
+
+# r = cs_client.cs_query_indicators_by_fql()                                                                             # API with default parameter values -- returns list of IOCs
+# r = cs_client.cs_get_indicators_by_fql(limit = 2, filter = 'type%3A"hash_sha256"')                                     # API with optional parameters values (including simple FQL query to filter the data) -- returns list of IOCs after FQL query filtering
+r = cs_client.cs_get_indicators_by_fql(limit = 500, filter = 'published_date%3A%3E%3D"2024-01-03T12%3A00%3A00Z"')        # API with optional parameters values (including a more complex FQL query to filter the data) -- returns list of IOCs after FQL query filtering
+
+# r = cs_client.cs_get_indicators_info_by_fql(limit = 2, filter = 'type%3A"hash_sha256"')                                # API with optional parameter values -- returns list of IOCs and additional related information
+
+if (r.status_code == 200):
+    print (r.text)
+else:
+    print (r.status_code)
+
+cs_client.cs_revoke_auth()
