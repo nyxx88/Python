@@ -140,6 +140,8 @@ class cs_api_client:
 
     ##### alerts
 
+    # This API is quite 'fussy', it only accepts double quote characters to enclose the composite_ids keyword and also the data.
+    # It also does not tolerate an extra comma at the end of a list of composite_ids.
     def cs_alerts_by_composite_ids(self, composite_ids):
         api_endpoint = '/alerts/entities/alerts/v2'
 
@@ -314,3 +316,4 @@ else:
     print(r)
 
 r = cs_client.cs_revoke_auth()
+# print (r.status_code)
