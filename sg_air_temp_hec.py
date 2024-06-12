@@ -6,34 +6,41 @@
 #
 # Usage:
 #  - Key parameters are:
-#    - cs_base_url -- Which Falcon cloud the tenant CID is on
-#    - cs_client_id -- ID of API client
-#    - cs_client_secret -- Secret of API client
-#  - These 3 parameters can be initialized from:
+#    - cs_sg_air_temp_hec_url -- CrowdStrike SG air temperature HEC ingestion URL
+#    - cs_sg_air_temp_hec_api_key -- CrowdStrike SG air temperature HEC API key
+#    - sg_gov_data_base_url -- SG government data access API base URL
+#    - sg_gov_air_temp_endpoint -- SG air temperature API endpoint
+#    - loop_duration -- Duration to run (in minutes)
+#    - sleep_duration -- Duration to sleep in between API calls (in minutes)
+#  - These parameters can be initialized from:
 #    - environment variables (if they exists):
-#      - URL
-#      - CLIENT_ID
-#      - CLIENT_SECRET
-#    - key-value pair in a text configuration file (specified via commandline using argument "--config_file") with the
+#      - CS_SG_AIR_TEMP_HEC_URL
+#      - CS_SG_AIR_TEMP_HEC_API_KEY
+#      - SG_GOV_DATA_BASE_URL
+#      - SG_GOV_AIR_TEMP_ENDPOINT
+#      - LOOP_DURATION
+#      - SLEEP_DURATION
+#    - key-value pair in a text configuration file (specified via commandline using argument "--configfile") with the
 #      following keys:
-#      - URL
-#      - CLIENT_ID
-#      - CLIENT_SECRET
+#      - CS_SG_AIR_TEMP_HEC_URL
+#      - CS_SG_AIR_TEMP_HEC_API_KEY
+#      - SG_GOV_DATA_BASE_URL
+#      - SG_GOV_AIR_TEMP_ENDPOINT
+#      - LOOP_DURATION
+#      - SLEEP_DURATION
 #    - commandline arguments
-#      - "--cs_url"
-#      - "--cs_id"
-#      - "--cs_secret"
-#
-# Modify the logic to call the APIs in the main portion of the script (near the bottom) according to your needs.
-#
-# Note: Usage of the various CrowdStrike APIs are beyond the scope of this script. There are other online resources
-#       that are better equipped for that purpose.
+#      - "--cs_sg_air_temp_hec_url"
+#      - "--cs_sg_air_temp_hec_api_key"
+#      - "--sg_gov_data_base_url"
+#      - "--sg_gov_air_temp_endpoint"
+#      - "--loop_duration"
+#      - "--sleep_duration"
 #
 # Example:
 #
-#           cs_api.py --configfile config.txt
+#           sg_air_temp_hec.py --configfile config.txt
 #
-#    The configuration file "config.txt" contains the necessary parameters needed for the API calls to work.
+#    The configuration file "config.txt" contains the necessary parameters needed for this script to work.
 #
 #######################################################################################################################
 #######################################################################################################################
@@ -53,14 +60,14 @@ from time import strftime
 #######################################################################################################################
 
 ##### CrowdStrike HEC
-sg_weather_cs_hec_ingest_url = None
-sg_weather_cs_hec_api_key = None
+cs_sg_air_temp_hec_url = None
+cs_sg_air_temp_hec_api_key = None
 
 ##### SG govt data source
 sg_gov_data_base_url = None
 sg_gov_data_api_endpoint = None
 
-##### Loop control
+##### Loop & sleep control
 loop_duration = None                                                                                                   # in minutes
 sleep_duration = None                                                                                                  # in minutes
 
@@ -111,18 +118,33 @@ def has_value(var):
         return(True)
 
 def init_envvar():
-    global cs_base_url
-    global cs_client_id
-    global cs_client_secret
+    global cs_sg_air_temp_hec_url
+    global cs_sg_air_temp_hec_api_key
 
-    cs_base_url = os.environ.get('URL')
-    cs_client_id = os.environ.get('CLIENT_ID')
-    cs_client_secret = os.environ.get('CLIENT_SECRET')
+    global sg_gov_data_base_url
+    global sg_gov_air_temp_endpoint
+
+    global loop_duration
+    global sleep_duration
+
+    cs_sg_air_temp_hec_url = os.environ.get('CS_SG_AIR_TEMP_HEC_URL')
+    cs_sg_air_temp_hec_api_key = os.environ.get('CS_SG_AIR_TEMP_HEC_API_KEY')
+
+    sg_gov_data_base_url = os.environ.get('SG_GOV_DATA_BASE_URL')
+    sg_gov_air_temp_endpoint = os.environ.get('SG_GOV_AIR_TEMP_ENDPOINT')
+
+    loop_duration = os.environ.get('LOOP_DURATION')
+    sleep_duration = os.environ.get('SLEEP_DURATION')
 
 def init_configfile(config_file):
-    global cs_base_url
-    global cs_client_id
-    global cs_client_secret
+    global cs_sg_air_temp_hec_url
+    global cs_sg_air_temp_hec_api_key
+
+    global sg_gov_data_base_url
+    global sg_gov_air_temp_endpoint
+
+    global loop_duration
+    global sleep_duration
 
     dummy = ' '
     try:
@@ -135,46 +157,20 @@ def init_configfile(config_file):
     config.read_string(file_content)
 
     try:
-        cs_base_url = config[dummy]['URL']
-        cs_client_id = config[dummy]['CLIENT_ID']
-        cs_client_secret = config[dummy]['CLIENT_SECRET']
+        cs_sg_air_temp_hec_url = config[dummy]['CS_SG_AIR_TEMP_HEC_URL']
+        cs_sg_air_temp_hec_api_key = config[dummy]['CS_SG_AIR_TEMP_HEC_API_KEY']
+
+        sg_gov_data_base_url = config[dummy]['SG_GOV_DATA_BASE_URL']
+        sg_gov_air_temp_endpoint = config[dummy]['SG_GOV_AIR_TEMP_ENDPOINT']
+
+        loop_duration = config[dummy]['LOOP_DURATION']
+        sleep_duration = config[dummy]['SLEEP_DURATION']
     except Exception as ex:
         error_message(config_file + ' :', exception = ex)
 
 def init_cli():
-    global cs_base_url
-    global cs_client_id
-    global cs_client_secret
-
-    # parse CLI
-    parser = argparse.ArgumentParser()
-
-    ##### generic use -- config file
-    parser.add_argument('--configfile', help = 'configuration file')
-
-    ##### CrowdStrike API invocation
-    parser.add_argument('--cs_url', help = 'CrowdStrike API base URL')
-    parser.add_argument('--cs_id', help = 'CrowdStrike API client ID')
-    parser.add_argument('--cs_secret', help = 'CrowdStrike API client password')
-
-    args = parser.parse_args()
-
-    if args.configfile is not None:
-        init_configfile(args.configfile)
-
-    if args.cs_url is not None:
-        cs_base_url = args.cs_url
-    if args.cs_id is not None:
-        cs_client_id = args.cs_id
-    if args.cs_secret is not None:
-        cs_client_secret = args.cs_secret
-
-    if not ((has_value(cs_base_url)) and (has_value(cs_client_id)) and (has_value(cs_client_secret))):
-        error_message('Insufficient arguments to proceed.\n')
-
-def init_param():
-    global sg_weather_cs_hec_ingest_url
-    global sg_weather_cs_hec_api_key
+    global cs_sg_air_temp_hec_url
+    global cs_sg_air_temp_hec_api_key
 
     global sg_gov_data_base_url
     global sg_gov_air_temp_endpoint
@@ -182,21 +178,58 @@ def init_param():
     global loop_duration
     global sleep_duration
 
-    ##### CrowdStrike HEC on Talon_1
-    # API key: xxxxxx
-    # Ingest URL: https://ingest.us-1.crowdstrike.com/api/ingest/hec/xxxxxx/v1/services/collector
-    sg_weather_cs_hec_ingest_url = 'https://ingest.us-1.crowdstrike.com/api/ingest/hec/xxxxxx/v1/services/collector'
-    sg_weather_cs_hec_api_key = 'xxxxxx'
+    # parse CLI
+    parser = argparse.ArgumentParser()
 
-    ##### Air Temperature across Singapore (https://beta.data.gov.sg/datasets/d_5b1a6d3688427dd41e2c234fe42fb863/view)
-    sg_gov_data_base_url = 'https://api.data.gov.sg'
-    sg_gov_air_temp_endpoint = '/v1/environment/air-temperature'
+    ##### generic use -- config file
+    parser.add_argument('--configfile', help = 'configuration file')
 
-    loop_duration = 0
-    sleep_duration = 5
+    ##### CrowdStrike HEC
+    parser.add_argument('--cs_sg_air_temp_hec_url', help = 'CrowdStrike SG air temperature HEC ingestion URL')
+    parser.add_argument('--cs_sg_air_temp_hec_api_key', help = 'CrowdStrike SG air temperature HEC API key')
 
-    # init_envvar()
-    # init_cli()
+    ##### SG air temperature data
+    parser.add_argument('--sg_gov_data_base_url', help = 'SG government data access API base URL')
+    parser.add_argument('--sg_gov_air_temp_endpoint', help = 'SG air temperature API endpoint')
+
+    ##### Loop & sleep control
+    parser.add_argument('--loop_duration', help = 'Duration to run (in minutes)')
+    parser.add_argument('--sleep_duration', help = 'Duration to sleep in between API calls (in minutes)')
+
+    args = parser.parse_args()
+
+    if args.configfile is not None:
+        init_configfile(args.configfile)
+
+    if args.cs_sg_air_temp_hec_url is not None:
+        cs_sg_air_temp_hec_url = args.cs_sg_air_temp_hec_url
+    if args.cs_sg_air_temp_hec_api_key is not None:
+        cs_sg_air_temp_hec_api_key = args.cs_sg_air_temp_hec_api_key
+
+    if args.sg_gov_data_base_url is not None:
+        sg_gov_data_base_url = args.sg_gov_data_base_url
+    if args.sg_gov_air_temp_endpoint is not None:
+        sg_gov_air_temp_endpoint = args.sg_gov_air_temp_endpoint
+
+    if args.loop_duration is not None:
+        loop_duration = args.loop_duration
+    if args.sleep_duration is not None:
+        sleep_duration = args.sleep_duration
+
+    if not ((has_value(cs_sg_air_temp_hec_url)) and (has_value(cs_sg_air_temp_hec_api_key)) and (has_value(sg_gov_data_base_url)) and (has_value(sg_gov_air_temp_endpoint)) and (has_value(loop_duration)) and (has_value(sleep_duration))):
+        error_message('Insufficient arguments to proceed.\n')
+
+def init_param():
+    global loop_duration
+    global sleep_duration
+
+    init_envvar()
+    init_cli()
+
+    if (loop_duration != None):
+        loop_duration = int(loop_duration)
+    if (sleep_duration != None):
+        sleep_duration = int(sleep_duration)
 
     if ((loop_duration > 0) and (sleep_duration > 0)):
       if (loop_duration < sleep_duration):
@@ -213,7 +246,7 @@ init_param()
 old_ts = None
 new_ts = None
 
-sg_air_temp_hec = cs_hec_ingest_client(sg_weather_cs_hec_ingest_url, sg_weather_cs_hec_api_key)
+sg_air_temp_hec = cs_hec_ingest_client(cs_sg_air_temp_hec_url, cs_sg_air_temp_hec_api_key)
 sg_air_temp = sg_gov_data_client(sg_gov_data_base_url)
 
 if (loop_duration == 0):
