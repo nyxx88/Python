@@ -87,6 +87,26 @@ class cs_api_client:
 
         return(self.http_client.post(url, headers = h, data = data))
 
+    # To cater to 'fussy' APIs, that only accepts double quote characters to enclose the keyword name (the dataname parameter)
+    # and also the data (the individual item in items parameter). It also does not tolerate an extra comma at the end of a list of
+    # items.
+    def cs_post_body_builder(self, dataname, items):
+        body = '{ "' + dataname + '": ['
+
+        no_items = len(items)
+        if (no_items > 0):
+            i = 0
+
+            for item in items:
+                body = body + '"' + item + '"'
+                i += 1
+                if (i < no_items):
+                    body = body + ', '
+
+        body = body + ']}'
+
+        return(body)
+
     ## CS API calls ###################################################################################################
 
     ##### oauth2
@@ -138,34 +158,46 @@ class cs_api_client:
 
         return(self.cs_generic_get(api_endpoint, parameters))
 
+    def cs_indicators(self, ids):
+        api_endpoint = '/intel/entities/indicators/GET/v1'
+
+        data = self.cs_post_body_builder('ids', ids)
+
+        return(self.cs_generic_post(api_endpoint, data))
+
     ##### alerts
 
-    # This API is quite 'fussy', it only accepts double quote characters to enclose the composite_ids keyword and also the data.
-    # It also does not tolerate an extra comma at the end of a list of composite_ids.
     def cs_alerts_by_composite_ids(self, composite_ids):
         api_endpoint = '/alerts/entities/alerts/v2'
 
-        data = '{ "composite_ids": ['
-
-        no_of_composite_ids = len(composite_ids)
-        if (no_of_composite_ids > 0):
-            i = 0
-
-            for composite_id in composite_ids:
-                data = data + '"' + composite_id + '"'
-                i += 1
-                if (i < no_of_composite_ids):
-                    data = data + ', '
-
-        data = data + ']}'
+        data = self.cs_post_body_builder('composite_ids', composite_ids)
 
         return(self.cs_generic_post(api_endpoint, data))
+
+    # def cs_alerts_by_composite_ids(self, composite_ids):
+    #     api_endpoint = '/alerts/entities/alerts/v2'
+
+    #     data = '{ "composite_ids": ['
+
+    #     no_of_composite_ids = len(composite_ids)
+    #     if (no_of_composite_ids > 0):
+    #         i = 0
+
+    #         for composite_id in composite_ids:
+    #             data = data + '"' + composite_id + '"'
+    #             i += 1
+    #             if (i < no_of_composite_ids):
+    #                 data = data + ', '
+
+    #     data = data + ']}'
+
+    #     return(self.cs_generic_post(api_endpoint, data))
 
 ## HTTP helpers #######################################################################################################
 
 def build_http_header(*params):                                                                                        # accepts tuple datatype
     h = {
-            'accept': 'application/json'
+            "accept": "application/json"
         }
 
     if (len(params) > 0):
@@ -296,18 +328,22 @@ if (cs_client.cs_auth() == False):
 # - e.g. published_date:>="2024-01-01T12:00:00Z" (human readable)
 # - e.g. published_date%3A%3E%3D"2024-01-03T12%3A00%3A00Z (in code)
 
-##### Threat intel indicators
+##### Threat intel - query indicators by FQL
 
 # r = cs_client.cs_get_indicators_by_fql()                                                                               # API with default parameter values -- returns list of IOCs
 # r = cs_client.cs_get_indicators_by_fql(limit = 2, filter = 'type%3A"hash_sha256"')                                     # API with optional parameters values (including simple FQL query to filter the data) -- returns list of IOCs after FQL query filtering
 # r = cs_client.cs_get_indicators_by_fql(limit = 500, filter = 'published_date%3A%3E%3D"2024-01-03T12%3A00%3A00Z"')      # API with optional parameters values (including a more complex FQL query to filter the data) -- returns list of IOCs after FQL query filtering
 # r = cs_client.cs_get_indicators_info_by_fql(limit = 2, filter = 'type%3A"hash_sha256"')                                # API with optional parameter values -- returns list of IOCs and additional related information
 
+##### Threat intel - query indicators by IDs
+
+r = cs_client.cs_indicators(('hash_sha256_574ec46f739d7145dd47952c81fc51f7b708c495223dc5293788e44ebb40aeeb', 'ip_address_195.123.211.210', 'domain_f3.ttkt.cc'))
+
 ##### Alerts
 
 # r = cs_client.cs_alerts_by_composite_ids(('49651999c4e64e18bca87d92dd7d5829:ind:89dc8ecfde364f88a666272f41ed0210:2245537033-10141-8820496', ))               # API to retrieve detection alert details
 # r = cs_client.cs_alerts_by_composite_ids(('49651999c4e64e18bca87d92dd7d5829:ind:fb22963210354d57b8c67b76c99b3fbf:4671593601-5702-1216272', ))
-r = cs_client.cs_alerts_by_composite_ids(('49651999c4e64e18bca87d92dd7d5829:ind:89dc8ecfde364f88a666272f41ed0210:2245537033-10141-8820496', '49651999c4e64e18bca87d92dd7d5829:ind:fb22963210354d57b8c67b76c99b3fbf:4671593601-5702-1216272'))
+# r = cs_client.cs_alerts_by_composite_ids(('49651999c4e64e18bca87d92dd7d5829:ind:caf6d40ace3f422985e805051a9096c7:5272507902-10193-3464464', '49651999c4e64e18bca87d92dd7d5829:ind:181eb79ad3724245b272f019dd03115f:5273998308-5702-2715408'))
 
 if (r.status_code == 200):
     print (r.text)
