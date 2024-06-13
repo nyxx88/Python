@@ -4,6 +4,9 @@
 # Packages to install:
 # - "pip install httpx[http2]" (Install httpx with HTTP/2 support)
 #
+# Just some code hastily put together, not optimized or well designed/structured. But it gets the job done & illustrates
+# the concept.
+#
 # Usage:
 #  - Key parameters are:
 #    - cs_sg_air_temp_hec_url -- CrowdStrike SG air temperature HEC ingestion URL
